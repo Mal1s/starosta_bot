@@ -14,14 +14,28 @@ interface ThemeContextValue {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
+function readStored<T extends string>(key: string, fallback: T): T {
+  if (typeof localStorage === 'undefined') return fallback;
+  const val = localStorage.getItem(key);
+  return (val as T) || fallback;
+}
+
+function writeStored(key: string, value: string) {
+  if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
+}
+
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark');
-  const [background, setBackground] = useState<Background>('gradient');
-  const [reduceMotion, setReduceMotion] = useState(false);
+  const [theme, setThemeState] = useState<Theme>(() => readStored('app-theme', 'dark'));
+  const [background, setBackgroundState] = useState<Background>(() => readStored('app-bg', 'gradient'));
+  const [reduceMotion, setReduceMotionState] = useState<boolean>(() => readStored('app-reduce-motion', 'false') === 'true');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  const setTheme = (t: Theme) => { setThemeState(t); writeStored('app-theme', t); };
+  const setBackground = (b: Background) => { setBackgroundState(b); writeStored('app-bg', b); };
+  const setReduceMotion = (v: boolean) => { setReduceMotionState(v); writeStored('app-reduce-motion', String(v)); };
 
   return (
     <ThemeContext.Provider value={{ theme, background, reduceMotion, setTheme, setBackground, setReduceMotion }}>

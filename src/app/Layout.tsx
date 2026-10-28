@@ -13,7 +13,7 @@ export function Layout({ children }: Props) {
     <div className="min-h-screen flex flex-col" style={{ color: 'var(--text)' }}>
       <BackgroundCanvas background={background} reduceMotion={reduceMotion} />
       <main
-        className="flex-1 mx-auto w-full max-w-md px-4 pb-20"
+        className="flex-1 mx-auto w-full max-w-md px-4"
         style={{
           paddingTop: 'env(safe-area-inset-top)',
           paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)',

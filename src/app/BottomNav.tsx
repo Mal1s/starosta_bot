@@ -45,7 +45,7 @@ export function BottomNav({ role }: { role: Role }) {
     >
       <div className="mx-auto max-w-md flex items-center justify-around h-16">
         {items.map((item) => {
-          const active = location.pathname.startsWith(item.path);
+          const active = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
           const Icon = item.icon;
           return (
             <button

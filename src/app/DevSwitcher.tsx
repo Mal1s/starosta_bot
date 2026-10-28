@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { setDevRole, getDevRole } from '@/mock';
 import { ru } from '@/i18n/ru';
 import { useAppStore } from '@/app/store';
@@ -13,13 +14,14 @@ const roles: { key: DevRole; label: string }[] = [
 ];
 
 export function DevSwitcher() {
-  const current = getDevRole();
+  const [current, setCurrent] = useState<DevRole>(getDevRole());
   const setMe = useAppStore((s) => s.setMe);
   const client = useAppStore((s) => s.client);
 
   async function switchRole(role: DevRole) {
     haptic('light');
     setDevRole(role);
+    setCurrent(role);
     if (client) {
       try {
         const me = await client.getMe();
