@@ -1,0 +1,107 @@
+/* Theme CSS variables — applied via data-theme on <html> */
+:root {
+  --bg: #0B0F1A;
+  --surface: #141A2B;
+  --surface-2: #1B2338;
+  --text: #E8ECF8;
+  --muted: #8A94B2;
+  --primary: #4D8DFF;
+  --accent: #22D3EE;
+  --success: #34D399;
+  --danger: #F87171;
+  --warning: #FBBF24;
+  --border: #263052;
+}
+
+[data-theme="dark"] {
+  --bg: #0B0F1A;
+  --surface: #141A2B;
+  --surface-2: #1B2338;
+  --text: #E8ECF8;
+  --muted: #8A94B2;
+  --primary: #4D8DFF;
+  --accent: #22D3EE;
+  --success: #34D399;
+  --danger: #F87171;
+  --warning: #FBBF24;
+  --border: #263052;
+}
+
+[data-theme="light"] {
+  --bg: #F5F7FB;
+  --surface: #FFFFFF;
+  --surface-2: #EEF1F8;
+  --text: #151A2C;
+  --muted: #5E6784;
+  --primary: #2563EB;
+  --accent: #0EA5E9;
+  --success: #16A34A;
+  --danger: #DC2626;
+  --warning: #D97706;
+  --border: #DDE2EF;
+}
+
+[data-theme="forest"] {
+  --bg: #0C1A12;
+  --surface: #13261B;
+  --surface-2: #1A3225;
+  --text: #E6F4EA;
+  --muted: #8FB59C;
+  --primary: #3DDC84;
+  --accent: #A3E635;
+  --success: #4ADE80;
+  --danger: #F87171;
+  --warning: #FACC15;
+  --border: #234431;
+}
+
+[data-theme="sky"] {
+  --bg: #EAF6FF;
+  --surface: #FFFFFF;
+  --surface-2: #DCEFFD;
+  --text: #0B2540;
+  --muted: #55728F;
+  --primary: #1D9BF0;
+  --accent: #38BDF8;
+  --success: #10B981;
+  --danger: #EF4444;
+  --warning: #F59E0B;
+  --border: #C6E2F7;
+}
+
+[data-theme="pink"] {
+  --bg: #FFF1F6;
+  --surface: #FFFFFF;
+  --surface-2: #FFE0EC;
+  --text: #3B0F23;
+  --muted: #94586F;
+  --primary: #EC4899;
+  --accent: #F472B6;
+  --success: #10B981;
+  --danger: #E11D48;
+  --warning: #F59E0B;
+  --border: #FBCFE0;
+}
+
+[data-theme="red"] {
+  --bg: #1A0B0E;
+  --surface: #2A1216;
+  --surface-2: #381A1F;
+  --text: #FBE9EA;
+  --muted: #C79097;
+  --primary: #EF4444;
+  --accent: #FB923C;
+  --success: #4ADE80;
+  --danger: #FCA5A5;
+  --warning: #FBBF24;
+  --border: #4A242B;
+}
+
+html {
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+}
