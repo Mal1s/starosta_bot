@@ -1,8 +1,8 @@
+@import './styles/themes.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import './styles/themes.css';
 
 @keyframes gradientBreath {
   0%, 100% { background-position: 0% 50%; }
