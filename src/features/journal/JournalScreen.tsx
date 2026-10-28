@@ -1,6 +1,7 @@
+import { type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { Check, X, Clock, ShieldCheck } from 'lucide-react';
+import { Check, X, Clock } from 'lucide-react';
 import { ru } from '@/i18n/ru';
 import { Card, ScreenHeader, LoadingSpinner, EmptyState, Button } from '@/components/ui';
 import { StaggerGroup, StaggerItem } from '@/components/PageTransition';
@@ -76,7 +77,7 @@ function JournalBlock({
 }) {
   if (rows.length === 0) return null;
 
-  const iconMap = {
+  const iconMap: Record<string, ReactNode> = {
     will: <Check size={14} color="var(--success)" />,
     noanswer: <Clock size={14} color="var(--warning)" />,
     others: <X size={14} color="var(--danger)" />,
@@ -95,7 +96,7 @@ function JournalBlock({
           className="w-7 h-7 rounded-lg flex items-center justify-center"
           style={{ backgroundColor: `color-mix(in srgb, ${colorMap[variant]} 15%, transparent)` }}
         >
-          {iconMap}
+          {iconMap[variant]}
         </div>
         <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
           {title} <span style={{ color: 'var(--muted)' }}>({rows.length})</span>

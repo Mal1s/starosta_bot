@@ -27,7 +27,7 @@ function writeStored(key: string, value: string) {
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => readStored('app-theme', 'dark'));
   const [background, setBackgroundState] = useState<Background>(() => readStored('app-bg', 'gradient'));
-  const [reduceMotion, setReduceMotionState] = useState<boolean>(() => readStored('app-reduce-motion', 'false') === 'true');
+  const [reduceMotion, setReduceMotionState] = useState<boolean>(() => readStored<'true' | 'false'>('app-reduce-motion', 'false') === 'true');
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
