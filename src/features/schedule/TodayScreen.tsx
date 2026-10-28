@@ -1,10 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { CalendarDays, MapPin, User, Clock } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { CalendarDays, MapPin, User, Clock, CheckCircle2, Circle, Megaphone } from 'lucide-react';
 import { ru } from '@/i18n/ru';
-import { Card, ScreenHeader, LoadingSpinner, EmptyState, Button } from '@/components/ui';
+import { Card, ScreenHeader, LoadingSpinner, EmptyState, Button, Badge } from '@/components/ui';
+import { StaggerGroup, StaggerItem } from '@/components/PageTransition';
 import { useAppStore } from '@/app/store';
 import { isStaff } from '@/lib/permissions';
 import { formatDate, todayISO } from '@/lib/time';
+import { haptic } from '@/lib/telegram';
 
 export function TodayScreen() {
   const client = useAppStore((s) => s.client)!;
@@ -48,53 +51,79 @@ export function TodayScreen() {
       )}
 
       {unreadCount > 0 && (
-        <Card className="mb-4" >
-          <div className="flex items-center justify-between">
-            <p className="text-sm" style={{ color: 'var(--text)' }}>
-              {ru.ann.new} ({unreadCount})
-            </p>
-            <Button size="sm" variant="ghost">{ru.ann.readAll}</Button>
-          </div>
-        </Card>
+        <motion.div
+          initial={{ opacity: 0, x: -16 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.3, delay: 0.1 }}
+        >
+          <Card className="mb-4" delay={0.1}>
+            <div className="flex items-center gap-3">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: 'color-mix(in srgb, var(--primary) 15%, transparent)' }}
+              >
+                <Megaphone size={20} color="var(--primary)" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+                  {ru.ann.new} ({unreadCount})
+                </p>
+              </div>
+              <Button size="sm" variant="ghost" onClick={() => { haptic('light'); }}>
+                {ru.ann.readAll}
+              </Button>
+            </div>
+          </Card>
+        </motion.div>
       )}
 
       {isLoading ? (
         <LoadingSpinner />
       ) : schedule && schedule.length > 0 ? (
-        <div className="space-y-3">
-          {schedule[0].slots.map((slot) => (
-            <Card key={slot.id}>
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <p className="font-semibold" style={{ color: 'var(--text)' }}>{slot.subject}</p>
-                  <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                    <span className="flex items-center gap-1">
-                      <Clock size={12} /> {slot.starts}–{slot.ends}
+        <StaggerGroup className="space-y-3">
+          {schedule[0].slots.map((slot, i) => (
+            <StaggerItem key={slot.id}>
+              <Card delay={i * 0.06}>
+                <div className="flex items-start gap-3">
+                  <div
+                    className="flex flex-col items-center justify-center rounded-xl px-2 py-1.5 shrink-0"
+                    style={{ backgroundColor: 'var(--surface-2)' }}
+                  >
+                    <span className="text-[10px] font-medium" style={{ color: 'var(--muted)' }}>
+                      {slot.starts}
                     </span>
-                    {slot.room && (
-                      <span className="flex items-center gap-1">
-                        <MapPin size={12} /> {slot.room}
-                      </span>
+                    <span className="text-[10px]" style={{ color: 'var(--muted)' }}>
+                      {slot.ends}
+                    </span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-semibold truncate" style={{ color: 'var(--text)' }}>{slot.subject}</p>
+                      {slot.subgroup_name && (
+                        <Badge color="accent">{slot.subgroup_name}</Badge>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1.5 text-xs" style={{ color: 'var(--muted)' }}>
+                      {slot.room && (
+                        <span className="flex items-center gap-1">
+                          <MapPin size={12} /> {slot.room}
+                        </span>
+                      )}
+                      {slot.teacher && (
+                        <span className="flex items-center gap-1 truncate">
+                          <User size={12} /> {slot.teacher}
+                        </span>
+                      )}
+                    </div>
+                    {slot.cancelled && (
+                      <p className="text-xs mt-1.5" style={{ color: 'var(--danger)' }}>{ru.schedule.cancelled}</p>
                     )}
                   </div>
-                  {slot.teacher && (
-                    <div className="flex items-center gap-1 mt-1 text-xs" style={{ color: 'var(--muted)' }}>
-                      <User size={12} /> {slot.teacher}
-                    </div>
-                  )}
                 </div>
-                {slot.subgroup_name && (
-                  <span className="text-xs px-2 py-0.5 rounded-md" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--accent)' }}>
-                    {slot.subgroup_name}
-                  </span>
-                )}
-              </div>
-              {slot.cancelled && (
-                <p className="text-xs" style={{ color: 'var(--danger)' }}>{ru.schedule.cancelled}</p>
-              )}
-            </Card>
+              </Card>
+            </StaggerItem>
           ))}
-        </div>
+        </StaggerGroup>
       ) : (
         <EmptyState title={ru.schedule.noLessons} />
       )}
@@ -104,14 +133,17 @@ export function TodayScreen() {
 
 function OnboardingStep({ label, done }: { label: string; done: boolean }) {
   return (
-    <div className="flex items-center gap-2">
-      <div
-        className="w-5 h-5 rounded-full flex items-center justify-center text-xs"
-        style={{ backgroundColor: done ? 'var(--success)' : 'var(--surface-2)', color: done ? '#fff' : 'var(--muted)' }}
-      >
-        {done ? '✓' : '○'}
-      </div>
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      className="flex items-center gap-2"
+    >
+      {done ? (
+        <CheckCircle2 size={18} color="var(--success)" />
+      ) : (
+        <Circle size={18} color="var(--muted)" />
+      )}
       <span className="text-sm" style={{ color: done ? 'var(--text)' : 'var(--muted)' }}>{label}</span>
-    </div>
+    </motion.div>
   );
 }

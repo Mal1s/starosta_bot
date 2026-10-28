@@ -1,8 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
+import { motion } from 'framer-motion';
+import { Check, X, Clock, ShieldCheck } from 'lucide-react';
 import { ru } from '@/i18n/ru';
 import { Card, ScreenHeader, LoadingSpinner, EmptyState, Button } from '@/components/ui';
+import { StaggerGroup, StaggerItem } from '@/components/PageTransition';
 import { useAppStore } from '@/app/store';
 import { todayISO } from '@/lib/time';
+import { haptic } from '@/lib/telegram';
+import type { JournalRow } from '@/api/types';
 
 export function JournalScreen() {
   const client = useAppStore((s) => s.client)!;
@@ -35,58 +40,126 @@ export function JournalScreen() {
     <div>
       <ScreenHeader title={ru.nav.journal} />
 
-      <div className="space-y-4">
-        <JournalBlock title={ru.journal.blockWill} rows={willBlock} variant="will" />
-        <JournalBlock title={ru.journal.blockNoAnswer} rows={noAnswerBlock} variant="noanswer" />
+      <StaggerGroup className="space-y-4">
+        <StaggerItem>
+          <JournalBlock title={ru.journal.blockWill} rows={willBlock} variant="will" delay={0} />
+        </StaggerItem>
+        <StaggerItem>
+          <JournalBlock title={ru.journal.blockNoAnswer} rows={noAnswerBlock} variant="noanswer" delay={0.06} />
+        </StaggerItem>
         {othersBlock.length > 0 && (
-          <JournalBlock title={ru.journal.blockOthers} rows={othersBlock} variant="others" />
+          <StaggerItem>
+            <JournalBlock title={ru.journal.blockOthers} rows={othersBlock} variant="others" delay={0.12} />
+          </StaggerItem>
         )}
-      </div>
+      </StaggerGroup>
 
-      <div className="mt-6">
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-6">
         <Button fullWidth variant="danger">
           {ru.journal.close}
         </Button>
-      </div>
+      </motion.div>
     </div>
   );
 }
 
-function JournalBlock({ title, rows, variant }: { title: string; rows: import('@/api/types').JournalRow[]; variant: 'will' | 'noanswer' | 'others' }) {
+function JournalBlock({
+  title,
+  rows,
+  variant,
+  delay = 0,
+}: {
+  title: string;
+  rows: JournalRow[];
+  variant: 'will' | 'noanswer' | 'others';
+  delay?: number;
+}) {
   if (rows.length === 0) return null;
+
+  const iconMap = {
+    will: <Check size={14} color="var(--success)" />,
+    noanswer: <Clock size={14} color="var(--warning)" />,
+    others: <X size={14} color="var(--danger)" />,
+  };
+
+  const colorMap = {
+    will: 'var(--success)',
+    noanswer: 'var(--warning)',
+    others: 'var(--danger)',
+  };
+
   return (
-    <Card>
-      <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text)' }}>
-        {title} <span style={{ color: 'var(--muted)' }}>({rows.length})</span>
-      </p>
-      <div className="space-y-2">
-        {rows.map((row) => (
-          <div key={row.membership_id} className="flex items-center justify-between py-2">
+    <Card delay={delay}>
+      <div className="flex items-center gap-2 mb-3">
+        <div
+          className="w-7 h-7 rounded-lg flex items-center justify-center"
+          style={{ backgroundColor: `color-mix(in srgb, ${colorMap[variant]} 15%, transparent)` }}
+        >
+          {iconMap}
+        </div>
+        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
+          {title} <span style={{ color: 'var(--muted)' }}>({rows.length})</span>
+        </p>
+      </div>
+      <div className="space-y-1">
+        {rows.map((row, i) => (
+          <motion.div
+            key={row.membership_id}
+            initial={{ opacity: 0, x: -8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: delay + i * 0.03 }}
+            className="flex items-center justify-between py-2"
+          >
             <span className="text-sm" style={{ color: 'var(--text)' }}>{row.full_name}</span>
             {variant === 'will' && (
               <div className="flex gap-1">
-                <button className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--danger)' }}>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => haptic('medium')}
+                  className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                  style={{ backgroundColor: 'var(--surface-2)', color: 'var(--danger)' }}
+                >
                   {ru.journal.notCameBtn}
-                </button>
-                <button className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--warning)' }}>
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => haptic('medium')}
+                  className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                  style={{ backgroundColor: 'var(--surface-2)', color: 'var(--warning)' }}
+                >
                   {ru.journal.lateBtn}
-                </button>
+                </motion.button>
               </div>
             )}
             {variant === 'noanswer' && (
               <div className="flex gap-1">
-                <button className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--success)' }}>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => haptic('medium')}
+                  className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                  style={{ backgroundColor: 'var(--surface-2)', color: 'var(--success)' }}
+                >
                   {ru.journal.came}
-                </button>
-                <button className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--danger)' }}>
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => haptic('medium')}
+                  className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                  style={{ backgroundColor: 'var(--surface-2)', color: 'var(--danger)' }}
+                >
                   {ru.journal.notCame}
-                </button>
-                <button className="text-xs px-2 py-1 rounded" style={{ backgroundColor: 'var(--surface-2)', color: 'var(--warning)' }}>
+                </motion.button>
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => haptic('medium')}
+                  className="text-xs px-2.5 py-1 rounded-lg font-medium"
+                  style={{ backgroundColor: 'var(--surface-2)', color: 'var(--warning)' }}
+                >
                   {ru.journal.validReason}
-                </button>
+                </motion.button>
               </div>
             )}
-          </div>
+          </motion.div>
         ))}
       </div>
     </Card>

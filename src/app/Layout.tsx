@@ -16,7 +16,7 @@ export function Layout({ children }: Props) {
         className="flex-1 mx-auto w-full max-w-md px-4"
         style={{
           paddingTop: 'env(safe-area-inset-top)',
-          paddingBottom: 'calc(env(safe-area-inset-bottom) + 5rem)',
+          paddingBottom: 'calc(env(safe-area-inset-bottom) + 5.5rem)',
         }}
       >
         {children}
