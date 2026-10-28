@@ -1,0 +1,17 @@
+{
+  "projectId": "72464966",
+  "functions": {
+    "api": {
+      "hasChanged": false,
+      "hash": "16bf9e22e0fefb2ad09aa3fff91609c978b5016ca069a3b665661f9ceff4f9572e77aa4636c97a63f9029a3104ba87bba3ca978391c0154280d0332e975696bd"
+    },
+    "bot-webhook": {
+      "hasChanged": false,
+      "hash": "0cfcdb5f4dd77b45e37423a9f3cd5852f2422d6f4feca26cbf9a678f6a61db5d2e77aa4636c97a63f9029a3104ba87bba3ca978391c0154280d0332e975696bd"
+    },
+    "scheduler-tick": {
+      "hasChanged": false,
+      "hash": "f664662da2656c1cf1346e35347f7f9e2f622fc7998358304f8140ce34bab96e2e77aa4636c97a63f9029a3104ba87bba3ca978391c0154280d0332e975696bd"
+    }
+  }
+}

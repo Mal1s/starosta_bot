@@ -1,0 +1,10 @@
+project_id = "aadwwelobcwjklyvkrbc"
+
+[functions.api]
+verify_jwt = false
+
+[functions.bot-webhook]
+verify_jwt = false
+
+[functions.scheduler-tick]
+verify_jwt = false
