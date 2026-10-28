@@ -191,7 +191,7 @@ export const mockApiClient: ApiClient = {
     const code = 'K7M-4Q2';
     return delay<CreateGroupResponse>({
       group: { ...demoGroup, name: input.name, timezone: input.timezone },
-      invite: { link: `https://t.me/starostabot?startapp=token123`, code },
+      invite: { link: `https://t.me/starostaa_help_bot?startapp=token123`, code },
       recovery_code: 'ABCD-EFGH-JKLM',
     });
   },
@@ -215,9 +215,9 @@ export const mockApiClient: ApiClient = {
   },
 
   getInvite: () =>
-    delay<InviteResponse>({ link: 'https://t.me/starostabot?startapp=token123', code: 'K7M-4Q2' }),
+    delay<InviteResponse>({ link: 'https://t.me/starostaa_help_bot?startapp=token123', code: 'K7M-4Q2' }),
   regenerateInvite: () =>
-    delay<InviteResponse>({ link: 'https://t.me/starostabot?startapp=newtoken', code: 'R9P-3X8' }),
+    delay<InviteResponse>({ link: 'https://t.me/starostaa_help_bot?startapp=newtoken', code: 'R9P-3X8' }),
   regenerateRecovery: () =>
     delay({ recovery_code: 'WXYZ-1234-ABCD' }),
 

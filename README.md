@@ -2,6 +2,12 @@
 
 Telegram Mini App для учебной группы: расписание, ежедневный опрос посещаемости, журнал, объявления и статистика.
 
+## Бот
+
+- **Название:** Староста — расписание и журнал
+- **Username:** @starostaa_help_bot
+- **Описание:** Расписание, опросы «буду на парах?» и журнал посещаемости для твоей группы. Бесплатно.
+
 ## Возможности
 
 - **Староста** управляет группой: расписание, журнал посещаемости, объявления, настройки, передача роли
@@ -28,93 +34,113 @@ React 18, Vite, TypeScript, Tailwind CSS, React Router, TanStack Query, Zustand,
 
 ---
 
-## Инструкция: настройка в BotFather
+## Настройка в BotFather (уже сделано)
 
-### 1. Создание бота
+Бот создан: @starostaa_help_bot
 
-1. Откройте [@BotFather](https://t.me/BotFather) в Telegram
-2. Отправьте `/newbot`
-3. Введите имя бота: **Староста бот**
-4. Введите username бота (должен заканчиваться на `bot`): например, `my_group_starosta_bot`
-5. Скопируйте **токен** (вида `123456789:ABCdefGhIJKlmNoPQRsTUVwxyz`) — он нужен для секрета `TELEGRAM_BOT_TOKEN`
+### Тексты бота
 
-### 2. Описание бота
-
-Отправьте BotFather следующие команды:
-
+**About** (короткий текст в профиле, до 120 символов):
 ```
-/setdescription
-```
-Выберите вашего бота и отправьте:
-```
-Расписание, опросы и журнал посещаемости для твоей учебной группы. Староста управляет расписанием и журналом, студенты отвечают на опрос одним тапом.
+Расписание, опросы «буду на парах?» и журнал посещаемости для твоей группы. Бесплатно.
 ```
 
+**Description** (экран перед первым запуском, до 512 символов):
 ```
-/setabouttext
-```
-Отправьте:
-```
-Староста бот — помощник для учебной группы: расписание, опросы посещаемости, журнал, объявления и статистика.
+Староста бот помогает группе жить без хаоса.
+
+📅 Расписание всегда под рукой, с отменами и переносами
+✅ Один тап в день: буду на парах или нет
+📊 Журнал посещаемости и статистика для старосты
+📣 Объявления, которые не потеряются
+🤒 Больничный и отгулы на несколько дней
+
+Староста создаёт группу и делится ссылкой, студенты заходят по ссылке и коду. Всё бесплатно, без рекламы.
 ```
 
-### 3. Команды бота
-
+**Commands:**
 ```
-/setcommands
-```
-Отправьте:
-```
-start - Начать работу с ботом
-help - Помощь и инструкция
+start - Начать и выбрать роль
+app - Открыть приложение
+help - Как пользоваться
 ```
 
-### 4. Настройка Mini App (Menu Button)
+### Настройки BotFather
 
+- **Allow Groups?** → Disable (бот работает только в личке)
+- **Inline Mode** → выключено
+- **Group Privacy** → не важно (группы выключены)
+
+### Картинки
+
+- **Botpic** (аватар): квадрат, PNG или JPG, 640×640+
+- **Description Picture** (баннер «Что умеет бот»): 640×360
+
+---
+
+## Настройка Mini App (нужно сделать после деплоя)
+
+### 1. Menu Button — кнопка в меню бота
+
+В BotFather:
 ```
 /setmenubutton
 ```
-Выберите бота и отправьте:
-- **URL:** адрес вашего задеплоенного Mini App (например, `https://your-app.netlify.app`)
+Выберите @starostaa_help_bot и отправьте:
+- **URL:** `https://<ВАШ-АДРЕС>.netlify.app` (адрес задеплоенного Mini App)
 - **Текст кнопки:** Открыть приложение
 
-Также можно задать через Bot API:
+Или через Bot API (замените `<TOKEN>` на токен бота):
 ```
-https://api.telegram.org/bot<TOKEN>/setChatMenuButton?
-  chat_id=<CHAT_ID>
-  &menu_button={"type":"web_app","text":"Открыть приложение","web_app":{"url":"https://your-app.netlify.app"}}
+https://api.telegram.org/bot9283014051:AAGhmUJ2r0FWVn55yFeDlmYUgOVMQvCxljk/setChatMenuButton
+
+POST body (JSON):
+{
+  "menu_button": {
+    "type": "web_app",
+    "text": "Открыть приложение",
+    "web_app": {
+      "url": "https://<ВАШ-АДРЕС>.netlify.app"
+    }
+  }
+}
 ```
 
-### 5. Настройка Web App (для ссылок приглашения)
+### 2. Web App URL — для ссылок приглашения
 
+В BotFather:
 ```
 /settings
 ```
-Выберите бота → **Web App** → отправьте URL вашего Mini App.
+Выберите @starostaa_help_bot → **Web App** → отправьте URL:
+```
+https://<ВАШ-АДРЕС>.netlify.app
+```
 
-Это нужно, чтобы ссылки вида `https://t.me/<BOT_USERNAME>?startapp=<token>` открывали Mini App.
+Это нужно, чтобы ссылки вида `https://t.me/starostaa_help_bot?startapp=<token>` открывали Mini App.
 
-### 6. Установка Webhook
+### 3. Установка Webhook
 
-После деплоя Edge Function `bot-webhook` установите webhook:
+После деплоя Edge Function `bot-webhook`:
 
 ```
-https://api.telegram.org/bot<TOKEN>/setWebhook?
-  url=https://<PROJECT_REF>.supabase.co/functions/v1/bot-webhook
-  &secret_token=<TELEGRAM_WEBHOOK_SECRET>
+https://api.telegram.org/bot9283014051:AAGhmUJ2r0FWVn55yFeDlmYUgOVMQvCxljk/setWebhook
+
+POST body (JSON):
+{
+  "url": "https://<PROJECT_REF>.supabase.co/functions/v1/bot-webhook",
+  "secret_token": "<TELEGRAM_WEBHOOK_SECRET>"
+}
 ```
 
 Где:
-- `<TOKEN>` — токен бота от BotFather
-- `<PROJECT_REF>` — ID проекта Supabase
-- `<TELEGRAM_WEBHOOK_SECRET>` — случайная строка (должна совпадать с секретом в Supabase)
+- `<PROJECT_REF>` — ID проекта Supabase (из URL проекта)
+- `<TELEGRAM_WEBHOOK_SECRET>` — случайная строка, должна совпадать с секретом в Supabase
 
-### 7. Иконка бота
-
+Проверить, что webhook установлен:
 ```
-/setuserpic
+https://api.telegram.org/bot9283014051:AAGhmUJ2r0FWVn55yFeDlmYUgOVMQvCxljk/getWebhookInfo
 ```
-Отправьте квадратное изображение (минимум 600×600 px) — логотип приложения.
 
 ---
 
@@ -122,23 +148,23 @@ https://api.telegram.org/bot<TOKEN>/setWebhook?
 
 ### Клиентские (`.env`)
 
-| Переменная | Описание |
+| Переменная | Значение |
 |---|---|
 | `VITE_SUPABASE_URL` | URL проекта Supabase |
-| `VITE_BOT_USERNAME` | username бота без `@` |
-| `VITE_DEV_MOCK` | `true` для dev-режима с моком, `false` для реального бэкенда |
+| `VITE_BOT_USERNAME` | `starostaa_help_bot` |
+| `VITE_DEV_MOCK` | `true` для dev-режима, `false` для реального бэкенда |
 
 ### Секреты Supabase (Edge Functions)
 
 | Секрет | Описание |
 |---|---|
-| `TELEGRAM_BOT_TOKEN` | Токен бота от BotFather |
+| `TELEGRAM_BOT_TOKEN` | `9283014051:AAGhmUJ2r0FWVn55yFeDlmYUgOVMQvCxljk` |
 | `TELEGRAM_WEBHOOK_SECRET` | Случайная строка для проверки webhook |
-| `BOT_USERNAME` | Имя бота без `@` |
+| `BOT_USERNAME` | `starostaa_help_bot` |
 | `APP_URL` | Адрес Mini App на Netlify |
 | `GEMINI_API_KEY` | API ключ Google Gemini (распознавание расписания) |
 | `GEMINI_MODEL` | Модель Gemini (например, `gemini-1.5-pro`) |
-| `ADMIN_TELEGRAM_ID` | Telegram ID администратора проекта |
+| `ADMIN_TELEGRAM_ID` | Ваш Telegram ID |
 | `CRON_SECRET` | Секрет для вызова scheduler-tick из pg_cron |
 
 ---
@@ -150,15 +176,38 @@ https://api.telegram.org/bot<TOKEN>/setWebhook?
 1. Подключите репозиторий к Netlify
 2. Build command: `npm run build`
 3. Publish directory: `dist`
-4. Добавьте переменные окружения
-5. Укажите адрес в `APP_URL` и в BotFather → Menu Button
+4. Добавьте переменные окружения:
+   - `VITE_SUPABASE_URL` — URL проекта Supabase
+   - `VITE_BOT_USERNAME` — `starostaa_help_bot`
+   - `VITE_DEV_MOCK` — `false` (для production)
+5. После деплоя возьмите URL (например `https://starosta-bot.netlify.app`)
+6. Укажите этот URL в BotFather → Menu Button и Web App
 
 ### Бэкенд (Supabase)
 
 1. Создайте проект Supabase
 2. Включите расширения `pg_cron` и `pg_net`
 3. Запустите миграции из `supabase/migrations/`
-4. Задайте секреты Edge Functions
+4. Задайте секреты Edge Functions (см. таблицу выше)
 5. Задеплойте Edge Functions: `api`, `bot-webhook`, `scheduler-tick`
 6. Установите webhook бота (см. выше)
 7. Настройте pg_cron (миграция `0004_cron.sql`)
+
+---
+
+## Команда /app
+
+Команда `/app` открывает Mini App напрямую. В обработчике `bot-webhook`:
+
+```typescript
+if (text === '/app') {
+  await sendMessage(chatId, 'Открываю приложение…', {
+    reply_markup: {
+      inline_keyboard: [[{
+        text: 'Открыть приложение',
+        web_app: { url: `${APP_URL}` }
+      }]]
+    }
+  });
+}
+```
