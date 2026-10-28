@@ -1,5 +1,7 @@
 import type { Role } from '@/lib/permissions';
-import type { Slot } from '@/lib/rules';
+import type { Slot, EffectiveStatus } from '@/lib/rules';
+
+export type { Slot, EffectiveStatus };
 
 export interface User {
   id: string;

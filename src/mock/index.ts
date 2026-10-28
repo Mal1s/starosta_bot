@@ -1,4 +1,4 @@
-import type { ApiClient } from './client';
+import type { ApiClient } from '@/api/client';
 import type {
   MeResponse,
   CreateGroupResponse,
@@ -14,8 +14,8 @@ import type {
   MyStats,
   Slot,
   BellEntry,
-} from './types';
-import { effectiveStatus, type EffectiveStatus } from '@/lib/rules';
+} from '@/api/types';
+import type { EffectiveStatus } from '@/lib/rules';
 
 type DevRole = 'headman' | 'deputy' | 'student1' | 'student2';
 
@@ -159,7 +159,7 @@ function slotsForDate(date: string): Slot[] {
 
 function studentSlots(date: string, membershipId: string): (Slot & { cancelled?: boolean; moved?: boolean })[] {
   const subIds = membershipSubgroups.get(membershipId) ?? [];
-  return slotsForDate(date).filter((s) => s.subgroup_id === null || subIds.includes(s.subgroup_id));
+  return slotsForDate(date).filter((s) => s.subgroup_id === null || subIds.includes(s.subgroup_id ?? ''));
 }
 
 export const mockApiClient: ApiClient = {
@@ -264,7 +264,7 @@ export const mockApiClient: ApiClient = {
     if (input.background) u.background = input.background;
     if (input.reduce_motion !== undefined) u.reduce_motion = input.reduce_motion;
     if (input.lesson_reminder_minutes !== undefined) u.lesson_reminder_minutes = input.lesson_reminder_minutes;
-    if (input.timezone !== undefined) u.timezone = input.timezone;
+    if (input.timezone !== undefined) u.timezone = input.timezone ?? 'Europe/Moscow';
     return delay(undefined);
   },
 
@@ -293,7 +293,7 @@ export const mockApiClient: ApiClient = {
       .filter((m) => m.status === 'active')
       .map((m) => {
         const subIds = membershipSubgroups.get(m.id) ?? [];
-        const studentSlotsForDay = daySlots.filter((s) => s.subgroup_id === null || subIds.includes(s.subgroup_id));
+        const studentSlotsForDay = daySlots.filter((s) => s.subgroup_id === null || subIds.includes(s.subgroup_id ?? ''));
         return {
           membership_id: m.id,
           full_name: m.full_name,

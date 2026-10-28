@@ -38,6 +38,7 @@ export function Button({
   disabled,
   fullWidth,
   size = 'md',
+  className = '',
 }: {
   children: ReactNode;
   onClick?: () => void;
@@ -45,6 +46,7 @@ export function Button({
   disabled?: boolean;
   fullWidth?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  className?: string;
 }) {
   const bgMap = {
     primary: 'var(--primary)',
@@ -68,7 +70,7 @@ export function Button({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 ${sizeMap[size]} ${fullWidth ? 'w-full' : ''}`}
+      className={`rounded-xl font-medium transition-all active:scale-95 disabled:opacity-50 disabled:active:scale-100 ${sizeMap[size]} ${fullWidth ? 'w-full' : ''} ${className}`}
       style={{
         backgroundColor: bgMap[variant],
         color: colorMap[variant],

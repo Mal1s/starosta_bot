@@ -9,6 +9,7 @@ import { useAppStore } from './store';
 import { mockApiClient } from '@/mock';
 import { httpApiClient } from '@/api/http';
 import { isStaff } from '@/lib/permissions';
+import type { MeResponse } from '@/api/types';
 
 import { WelcomeScreen } from '@/features/onboarding/WelcomeScreen';
 import { CreateGroupScreen } from '@/features/onboarding/CreateGroupScreen';
@@ -114,7 +115,7 @@ function AppInner() {
 
     if (isMock) {
       setLoading(true);
-      client.getMe().then((me) => {
+      client.getMe().then((me: MeResponse) => {
         setMe(me);
         setLoading(false);
       });
