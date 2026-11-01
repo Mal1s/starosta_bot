@@ -96,6 +96,19 @@ const demoGroup: Group = {
 const subgroups: Subgroup[] = [
   { id: sub1Id, group_id: groupId, name: 'Англ-1' },
   { id: sub2Id, group_id: groupId, name: 'Англ-2' },
+  { id: uuid(), group_id: groupId, name: 'Физ-1' },
+  { id: uuid(), group_id: groupId, name: 'Физ-2' },
+];
+
+const rosterEntries: RosterEntry[] = [
+  { id: uuid(), group_id: groupId, full_name: 'Александров Дмитрий' },
+  { id: uuid(), group_id: groupId, full_name: 'Борисова Елена' },
+  { id: uuid(), group_id: groupId, full_name: 'Васильев Игорь' },
+  { id: uuid(), group_id: groupId, full_name: 'Григорьева Ольга' },
+  { id: uuid(), group_id: groupId, full_name: 'Дмитриев Сергей' },
+  { id: uuid(), group_id: groupId, full_name: 'Егорова Анна' },
+  { id: uuid(), group_id: groupId, full_name: 'Жуков Алексей' },
+  { id: uuid(), group_id: groupId, full_name: 'Зайцева Мария' },
 ];
 
 const bellSchedule: BellEntry[] = [
@@ -206,7 +219,11 @@ export const mockApiClient: ApiClient = {
       full_name: input.full_name,
       joined_at: nowISO(),
     };
-    return delay(m);
+    memberships.set(`join-${m.id}`, m);
+    if (input.subgroup_ids && input.subgroup_ids.length > 0) {
+      membershipSubgroups.set(m.id, input.subgroup_ids);
+    }
+    return delay(m, 600);
   },
 
   restoreGroup: (recovery_code) => {
@@ -241,7 +258,7 @@ export const mockApiClient: ApiClient = {
   },
   updateMemberRole: () => delay(undefined),
 
-  getRoster: () => delay<RosterEntry[]>([]),
+  getRoster: () => delay<RosterEntry[]>(rosterEntries),
   addRoster: () => delay(undefined),
   deleteRoster: () => delay(undefined),
 
