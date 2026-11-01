@@ -1,7 +1,5 @@
 // Telegram initData verification for Edge Functions
-// Validates HMAC-SHA256 signature per Telegram spec
-
-import { createHmac, timingSafeEqual } from 'node:crypto';
+// Validates HMAC-SHA256 signature per Telegram WebApp spec
 
 export interface TelegramUser {
   id: number;
@@ -17,12 +15,20 @@ export interface VerifiedInitData {
   startParam?: string;
 }
 
-function botTokenToSecretKey(token: string): Uint8Array {
-  const encoder = new TextEncoder();
-  return encoder.encode(token);
+function timingSafeEqual(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a[i] ^ b[i];
+  }
+  return result === 0;
 }
 
-export function verifyInitData(initData: string, botToken: string): VerifiedInitData | null {
+export async function verifyInitData(
+  initData: string,
+  botToken: string,
+  maxAgeSec = 86400,
+): Promise<TelegramUser | null> {
   try {
     const params = new URLSearchParams(initData);
     const hash = params.get('hash');
@@ -30,42 +36,37 @@ export function verifyInitData(initData: string, botToken: string): VerifiedInit
 
     params.delete('hash');
 
-    const dataCheckString = Array.from(params.entries())
+    const dataCheck = [...params.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([k, v]) => `${k}=${v}`)
       .join('\n');
 
-    const secretKey = botTokenToSecretKey(botToken);
-    const secretKeyHmac = createHmac('sha256', secretKey as unknown as string)
-      .update('WebAppData')
-      .digest();
+    const enc = new TextEncoder();
 
-    const computedHash = createHmac('sha256', secretKeyHmac)
-      .update(dataCheckString)
-      .digest('hex');
+    const hmac = async (key: ArrayBuffer | Uint8Array, msg: string): Promise<Uint8Array> => {
+      const k = await crypto.subtle.importKey(
+        'raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+      );
+      return new Uint8Array(await crypto.subtle.sign('HMAC', k, enc.encode(msg)));
+    };
 
-    const computedBytes = Buffer.from(computedHash, 'hex');
-    const hashBytes = Buffer.from(hash, 'hex');
+    const secret = await hmac(enc.encode('WebAppData'), botToken);
+    const calc = await hmac(secret, dataCheck);
+    const calcHex = [...calc].map((b) => b.toString(16).padStart(2, '0')).join('');
 
-    if (computedBytes.length !== hashBytes.length) return null;
-    if (!timingSafeEqual(computedBytes, hashBytes)) return null;
+    const calcBytes = enc.encode(calcHex);
+    const hashBytes = enc.encode(hash);
+    if (!timingSafeEqual(calcBytes, hashBytes)) return null;
 
-    const authDateStr = params.get('auth_date');
-    if (!authDateStr) return null;
-    const authDate = parseInt(authDateStr, 10);
-
-    // Reject if older than 24 hours
-    const now = Math.floor(Date.now() / 1000);
-    if (now - authDate > 86400) return null;
+    const authDate = Number(params.get('auth_date'));
+    if (Date.now() / 1000 - authDate > maxAgeSec) return null;
 
     const userJson = params.get('user');
     if (!userJson) return null;
     const user = JSON.parse(userJson) as TelegramUser;
     if (!user.id) return null;
 
-    const startParam = params.get('start_param') ?? undefined;
-
-    return { user, authDate, startParam };
+    return user;
   } catch {
     return null;
   }

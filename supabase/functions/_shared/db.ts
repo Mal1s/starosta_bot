@@ -1,6 +1,7 @@
 // Database helpers for Edge Functions
 
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
+import type { TelegramUser } from './auth.ts';
 
 export function getSupabaseClient(): SupabaseClient {
   const url = Deno.env.get('SUPABASE_URL') ?? '';
@@ -10,15 +11,14 @@ export function getSupabaseClient(): SupabaseClient {
   });
 }
 
-export async function findOrCreateUser(telegramUser: {
-  id: number;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-  language_code?: string;
-}): Promise<{ id: string; telegram_id: number } | null> {
+export interface DbUser {
+  id: string;
+  telegram_id: number;
+}
+
+export async function findOrCreateUser(telegramUser: TelegramUser): Promise<DbUser | null> {
   const supabase = getSupabaseClient();
-  
+
   const { data: existing } = await supabase
     .from('users')
     .select('id, telegram_id')
@@ -26,14 +26,13 @@ export async function findOrCreateUser(telegramUser: {
     .maybeSingle();
 
   if (existing) {
-    // Update last active
     await supabase
       .from('users')
       .update({
         first_name: telegramUser.first_name ?? null,
         last_name: telegramUser.last_name ?? null,
         username: telegramUser.username ?? null,
-        last_active_at: new Date().toISOString(),
+        last_seen_at: new Date().toISOString(),
       })
       .eq('id', existing.id);
     return existing;
@@ -55,7 +54,19 @@ export async function findOrCreateUser(telegramUser: {
   return newUser;
 }
 
-export async function getUserMembership(userId: string) {
+export interface MembershipWithContext {
+  id: string;
+  group_id: string;
+  user_id: string;
+  role: string;
+  status: string;
+  full_name: string;
+  joined_at: string;
+  left_at: string | null;
+  groups: Record<string, unknown> | null;
+}
+
+export async function getUserMembership(userId: string): Promise<MembershipWithContext | null> {
   const supabase = getSupabaseClient();
   const { data } = await supabase
     .from('memberships')
@@ -63,5 +74,19 @@ export async function getUserMembership(userId: string) {
     .eq('user_id', userId)
     .in('status', ['active', 'pending'])
     .maybeSingle();
-  return data;
+  return data as MembershipWithContext | null;
+}
+
+export async function updateUserActivity(membershipId: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  await supabase
+    .from('memberships')
+    .update({ last_active_at: new Date().toISOString() })
+    .eq('id', membershipId);
+}
+
+export async function hashToken(token: string): Promise<string> {
+  const enc = new TextEncoder();
+  const buf = await crypto.subtle.digest('SHA-256', enc.encode(token));
+  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
 }
