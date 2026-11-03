@@ -20,7 +20,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   client: null,
   isMock: false,
   me: null,
-  loading: false,
+  loading: true,
   error: null,
   setClient: (client, isMock) => set({ client, isMock }),
   setMe: (me) => set({ me }),

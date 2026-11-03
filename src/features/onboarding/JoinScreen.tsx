@@ -19,11 +19,13 @@ function formatCode(value: string): string {
 export function JoinScreen() {
   const navigate = useNavigate();
   const client = useAppStore((s) => s.client);
-  const [step, setStep] = useState<Step>('code');
-  const [code, setCode] = useState(() => {
-    const startParam = getStartParam();
-    return startParam?.match(/^[A-Za-z0-9]{3}-?[A-Za-z0-9]{3}$/) ? formatCode(startParam) : '';
-  });
+  const setMe = useAppStore((s) => s.setMe);
+  const isMock = useAppStore((s) => s.isMock);
+  const startParam = getStartParam()?.trim();
+  const startCode = !!startParam && /^[A-Za-z0-9]{3}-?[A-Za-z0-9]{3}$/.test(startParam);
+  const inviteToken = startParam && !startCode ? startParam : undefined;
+  const [step, setStep] = useState<Step>(() => inviteToken ? 'identity' : 'code');
+  const [code, setCode] = useState(() => startCode && startParam ? formatCode(startParam) : '');
   const [fullName, setFullName] = useState('');
   const [rosterId, setRosterId] = useState<string | undefined>();
   const [selectedSubgroups, setSelectedSubgroups] = useState<string[]>([]);
@@ -36,7 +38,10 @@ export function JoinScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!client || step !== 'identity') return;
+    if (!client || step !== 'identity' || !isMock) {
+      setLoadingData(false);
+      return;
+    }
     let cancelled = false;
     setLoadingData(true);
     Promise.all([client.getRoster(), client.getSubgroups()])
@@ -53,7 +58,7 @@ export function JoinScreen() {
         if (!cancelled) setLoadingData(false);
       });
     return () => { cancelled = true; };
-  }, [client, step]);
+  }, [client, isMock, step]);
 
   const filteredRoster = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -64,7 +69,10 @@ export function JoinScreen() {
   function goBack() {
     haptic('light');
     if (step === 'code') navigate('/');
-    else if (step === 'identity') setStep('code');
+    else if (step === 'identity') {
+      if (inviteToken) navigate('/');
+      else setStep('code');
+    }
     else setStep('identity');
   }
 
@@ -84,15 +92,17 @@ export function JoinScreen() {
     setLoading(true);
     setError(null);
     try {
-      await client.joinGroup({
-        code: code.replace('-', ''),
+      const joined = await client.joinGroup({
+        ...(inviteToken ? { token: inviteToken } : { code: code.replace('-', '') }),
         full_name: fullName.trim(),
         roster_id: rosterId,
         subgroup_ids: selectedSubgroups,
         consent,
       });
+      const me = await client.getMe();
+      setMe(me);
       hapticNotify('success');
-      navigate('/pending');
+      navigate(joined.status === 'active' || me.membership?.status === 'active' ? '/today' : '/pending', { replace: true });
     } catch {
       hapticNotify('error');
       setError(ru.error.generic);

@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 type Theme = 'dark' | 'light' | 'forest' | 'sky' | 'pink' | 'red';
 type Background = 'gradient' | 'particles' | 'scene' | 'minimal' | 'parallax';
@@ -33,12 +33,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  const setTheme = (t: Theme) => { setThemeState(t); writeStored('app-theme', t); };
-  const setBackground = (b: Background) => { setBackgroundState(b); writeStored('app-bg', b); };
-  const setReduceMotion = (v: boolean) => { setReduceMotionState(v); writeStored('app-reduce-motion', String(v)); };
+  const setTheme = useCallback((t: Theme) => { setThemeState(t); writeStored('app-theme', t); }, []);
+  const setBackground = useCallback((b: Background) => { setBackgroundState(b); writeStored('app-bg', b); }, []);
+  const setReduceMotion = useCallback((v: boolean) => { setReduceMotionState(v); writeStored('app-reduce-motion', String(v)); }, []);
+  const value = useMemo(
+    () => ({ theme, background, reduceMotion, setTheme, setBackground, setReduceMotion }),
+    [theme, background, reduceMotion, setTheme, setBackground, setReduceMotion],
+  );
 
   return (
-    <ThemeContext.Provider value={{ theme, background, reduceMotion, setTheme, setBackground, setReduceMotion }}>
+    <ThemeContext.Provider value={value}>
       {children}
     </ThemeContext.Provider>
   );

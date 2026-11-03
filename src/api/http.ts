@@ -19,10 +19,10 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
   const json: ApiResponse<T> = await res.json();
 
-  if (!json.ok || !json.data) {
+  if (!res.ok || !json.ok) {
     throw new Error(json.error?.message ?? 'Request failed');
   }
-  return json.data;
+  return json.data as T;
 }
 
 export const httpApiClient: ApiClient = {
@@ -74,6 +74,11 @@ export const httpApiClient: ApiClient = {
   getSchedule: (from, to) =>
     request(`/schedule?from=${from}&to=${to}`),
   getScheduleRaw: () => request('/schedule/raw'),
+  getDayPoll: (date) => request(`/polls/day?date=${encodeURIComponent(date)}`),
+  submitPollAnswers: (input) =>
+    request('/polls/answer', { method: 'POST', body: JSON.stringify(input) }),
+  createAbsence: (input) =>
+    request('/absences', { method: 'POST', body: JSON.stringify(input) }),
   saveScheduleDraft: (input) =>
     request('/schedule/draft', { method: 'PUT', body: JSON.stringify(input) }),
   publishSchedule: () =>

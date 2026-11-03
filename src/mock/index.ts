@@ -14,6 +14,8 @@ import type {
   MyStats,
   Slot,
   BellEntry,
+  PollAnswerInput,
+  CreateAbsenceInput,
 } from '@/api/types';
 import type { EffectiveStatus } from '@/lib/rules';
 
@@ -143,6 +145,9 @@ const membershipSubgroups = new Map<string, string[]>([
   [memberships.get('student1')!.id, [sub1Id]],
   [memberships.get('student2')!.id, [sub2Id]],
 ]);
+const plannedAnswers = new Map<string, Map<string, PollAnswerInput>>();
+const actualAttendance = new Map<string, EffectiveStatus>();
+const closedDays = new Set<string>();
 
 export function setDevRole(role: DevRole) {
   currentDevRole = role;
@@ -299,6 +304,22 @@ export const mockApiClient: ApiClient = {
   },
 
   getScheduleRaw: () => delay({ slots: scheduleSlots, bell: bellSchedule }),
+  getDayPoll: async (date) => {
+    const days = await mockApiClient.getSchedule(date, date);
+    return delay({
+      date,
+      slots: days[0]?.slots ?? [],
+      answers: Array.from(plannedAnswers.get(date)?.values() ?? []),
+    });
+  },
+  submitPollAnswers: ({ date, answers }) => {
+    const dayAnswers = plannedAnswers.get(date) ?? new Map<string, PollAnswerInput>();
+    answers.forEach((answer) => dayAnswers.set(answer.slot_id, answer));
+    plannedAnswers.set(date, dayAnswers);
+    return delay(undefined);
+  },
+  createAbsence: (input: CreateAbsenceInput) =>
+    delay({ id: uuid(), ...input }),
   saveScheduleDraft: () => delay(undefined),
   publishSchedule: () => delay(undefined),
   getScheduleVersions: () => delay([{ id: uuid(), version: 1, created_at: nowISO() }]),
@@ -315,12 +336,14 @@ export const mockApiClient: ApiClient = {
           membership_id: m.id,
           full_name: m.full_name,
           cells: studentSlotsForDay.map((slot) => {
-            const status: EffectiveStatus = m.role === 'headman' ? 'present' : m.role === 'deputy' ? 'present' : 'no_data';
+            const attendanceKey = `${date}:${m.id}:${slot.id}`;
+            const status: EffectiveStatus = actualAttendance.get(attendanceKey)
+              ?? (m.role === 'headman' || m.role === 'deputy' ? 'present' : 'no_data');
             return { slot_id: slot.id, status, confirmed: status !== 'no_data' };
           }),
         };
       });
-    return delay<JournalDay>({ date, closed: false, rows, slots: daySlots });
+    return delay<JournalDay>({ date, closed: closedDays.has(date), rows, slots: daySlots });
   },
 
   getJournalRange: (from, to) => {
@@ -343,9 +366,20 @@ export const mockApiClient: ApiClient = {
     return delay(days);
   },
 
-  setAttendance: () => delay(undefined),
-  closeDay: () => delay(undefined),
-  reopenDay: () => delay(undefined),
+  setAttendance: ({ membership_id, date, slot_id, status }) => {
+    const key = `${date}:${membership_id}:${slot_id}`;
+    if (status) actualAttendance.set(key, status as EffectiveStatus);
+    else actualAttendance.delete(key);
+    return delay(undefined);
+  },
+  closeDay: (date) => {
+    closedDays.add(date);
+    return delay(undefined);
+  },
+  reopenDay: (date) => {
+    closedDays.delete(date);
+    return delay(undefined);
+  },
 
   getStats: (from, to) =>
     delay<StatsSummary>({

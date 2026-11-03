@@ -1,7 +1,10 @@
 import { useEffect } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MotionConfig } from 'framer-motion';
 import { ThemeProvider } from '@/components/ThemeProvider';
+import { useTheme } from '@/components/ThemeProvider';
+import type { Background, Theme } from '@/components/ThemeProvider';
 import { PageTransition } from '@/components/PageTransition';
 import { Layout } from './Layout';
 import { BottomNav } from './BottomNav';
@@ -12,6 +15,8 @@ import { mockApiClient } from '@/mock';
 import { httpApiClient } from '@/api/http';
 import { isStaff } from '@/lib/permissions';
 import type { MeResponse } from '@/api/types';
+import { getInitData } from '@/lib/telegram';
+import { ErrorState } from '@/components/ui';
 
 import { WelcomeScreen } from '@/features/onboarding/WelcomeScreen';
 import { CreateGroupScreen } from '@/features/onboarding/CreateGroupScreen';
@@ -36,12 +41,16 @@ const queryClient = new QueryClient({
 });
 
 const isMock = import.meta.env.VITE_DEV_MOCK === 'true';
+const themeOptions: Theme[] = ['dark', 'light', 'forest', 'sky', 'pink', 'red'];
+const backgroundOptions: Background[] = ['gradient', 'particles', 'scene', 'minimal', 'parallax'];
 
 function AppRoutes() {
   const me = useAppStore((s) => s.me);
   const loading = useAppStore((s) => s.loading);
+  const error = useAppStore((s) => s.error);
   const role = me?.membership?.role ?? null;
-  const hasGroup = !!me?.group && !!me?.membership;
+  const hasGroup = !!me?.group && me?.membership?.status === 'active';
+  const isPending = me?.membership?.status === 'pending';
 
   const location = useLocation();
   const isAuthScreen = ['/', '/create-group', '/join', '/pending'].includes(location.pathname);
@@ -71,11 +80,23 @@ function AppRoutes() {
     );
   }
 
-  if (!hasGroup && !isAuthScreen) {
+  if (error && !me && !isMock) {
+    return (
+      <div className="flex min-h-screen items-center justify-center px-6">
+        <ErrorState onRetry={() => window.location.reload()} />
+      </div>
+    );
+  }
+
+  if (isPending && location.pathname !== '/pending') {
+    return <Navigate to="/pending" replace />;
+  }
+
+  if (!hasGroup && !isPending && !isAuthScreen) {
     return <Navigate to="/" replace />;
   }
 
-  if (hasGroup && isAuthScreen && location.pathname !== '/pending') {
+  if (hasGroup && isAuthScreen) {
     return <Navigate to="/today" replace />;
   }
 
@@ -121,24 +142,55 @@ function AppInner() {
   const setClient = useAppStore((s) => s.setClient);
   const setMe = useAppStore((s) => s.setMe);
   const setLoading = useAppStore((s) => s.setLoading);
+  const setError = useAppStore((s) => s.setError);
+  const me = useAppStore((s) => s.me);
+  const { reduceMotion, setTheme, setBackground, setReduceMotion } = useTheme();
+
+  useEffect(() => {
+    if (!me?.user) return;
+    if (themeOptions.includes(me.user.theme as Theme)) setTheme(me.user.theme as Theme);
+    if (backgroundOptions.includes(me.user.background as Background)) setBackground(me.user.background as Background);
+    setReduceMotion(me.user.reduce_motion);
+  }, [me?.user?.theme, me?.user?.background, me?.user?.reduce_motion, setTheme, setBackground, setReduceMotion]);
 
   useEffect(() => {
     const client = isMock ? mockApiClient : httpApiClient;
     setClient(client, isMock);
 
-    if (isMock) {
-      setLoading(true);
-      client.getMe().then((me: MeResponse) => {
-        setMe(me);
-        setLoading(false);
-      });
+    if (!isMock && !getInitData().trim()) {
+      setMe(null);
+      setError(null);
+      setLoading(false);
+      return;
     }
-  }, [setClient, setMe, setLoading]);
+
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    client.getMe()
+      .then((me: MeResponse) => {
+        if (cancelled) return;
+        setMe(me);
+        setError(null);
+      })
+      .catch((reason: unknown) => {
+        if (cancelled) return;
+        setMe(null);
+        setError(reason instanceof Error ? reason.message : 'Не удалось загрузить профиль');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [setClient, setMe, setLoading, setError]);
 
   return (
-    <HashRouter>
-      <AppRoutes />
-    </HashRouter>
+    <MotionConfig reducedMotion={reduceMotion ? 'always' : 'user'}>
+      <HashRouter>
+        <AppRoutes />
+      </HashRouter>
+    </MotionConfig>
   );
 }
 

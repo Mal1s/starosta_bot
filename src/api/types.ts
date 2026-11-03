@@ -95,6 +95,29 @@ export interface BellEntry {
   ends: string;
 }
 
+export type PollAnswerValue = 'will' | 'wont' | 'late';
+export type PollReason = 'valid' | 'dont_want' | 'sick';
+
+export interface PollAnswerInput {
+  slot_id: string;
+  answer: PollAnswerValue;
+  reason?: PollReason;
+  comment?: string;
+}
+
+export interface DayPollResponse {
+  date: string;
+  slots: Slot[];
+  answers: PollAnswerInput[];
+}
+
+export interface CreateAbsenceInput {
+  date_from: string;
+  date_to?: string;
+  reason: PollReason;
+  comment?: string;
+}
+
 export interface DaySchedule {
   date: string;
   slots: (Slot & { cancelled?: boolean; moved?: boolean })[];
@@ -165,6 +188,6 @@ export interface ApiError {
 
 export interface ApiResponse<T> {
   ok: boolean;
-  data?: T;
+  data?: T | null;
   error?: ApiError;
 }

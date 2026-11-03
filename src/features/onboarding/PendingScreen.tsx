@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { useQuery } from '@tanstack/react-query';
 import { Hourglass, UserCheck, X } from 'lucide-react';
 import { ru } from '@/i18n/ru';
 import { Button } from '@/components/ui';
@@ -10,7 +11,27 @@ import { haptic } from '@/lib/telegram';
 export function PendingScreen() {
   const navigate = useNavigate();
   const client = useAppStore((s) => s.client);
+  const setMe = useAppStore((s) => s.setMe);
   const [revoking, setRevoking] = useState(false);
+  const [error, setError] = useState(false);
+
+  const { data: refreshedMe } = useQuery({
+    queryKey: ['me', 'membership-status'],
+    queryFn: () => client!.getMe(),
+    enabled: !!client,
+    refetchInterval: 15_000,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (!refreshedMe) return;
+    setMe(refreshedMe);
+    if (refreshedMe.membership?.status === 'active') {
+      navigate('/today', { replace: true });
+    } else if (!refreshedMe.membership || ['removed', 'left'].includes(refreshedMe.membership.status)) {
+      navigate('/', { replace: true });
+    }
+  }, [refreshedMe, setMe, navigate]);
 
   async function handleRevoke() {
     if (!client) return;
@@ -18,8 +39,10 @@ export function PendingScreen() {
     haptic('light');
     try {
       await client.leaveGroup();
-      navigate('/');
+      setMe(null);
+      navigate('/', { replace: true });
     } catch {
+      setError(true);
       setRevoking(false);
     }
   }
@@ -53,6 +76,7 @@ export function PendingScreen() {
       </motion.div>
 
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.8 }} className="relative z-10">
+        {error && <p role="alert" className="mb-3 text-sm" style={{ color: 'var(--danger)' }}>{ru.error.generic}</p>}
         <Button variant="ghost" size="sm" onClick={handleRevoke} disabled={revoking}>
           <span className="flex items-center gap-2" style={{ color: 'var(--danger)' }}>
             <X size={15} /> {ru.join.revoke}

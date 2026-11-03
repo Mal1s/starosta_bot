@@ -56,18 +56,34 @@ export function CreateGroupScreen() {
     }
   }
 
-  function handleCopy() {
+  async function handleCopy() {
     haptic('light');
-    navigator.clipboard?.writeText(recoveryCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    setError(null);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+      await navigator.clipboard.writeText(recoveryCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError('Не удалось скопировать код. Сохраните его вручную.');
+    }
   }
 
-  function handleEnterApp() {
+  async function handleEnterApp() {
     if (!client) return;
     haptic('light');
-    client.getMe().then((me) => setMe(me)).catch(() => {});
-    navigate('/today');
+    setLoading(true);
+    setError(null);
+    try {
+      const me = await client.getMe();
+      if (!me.group || me.membership?.status !== 'active') throw new Error('Group setup is not ready');
+      setMe(me);
+      navigate('/today', { replace: true });
+    } catch {
+      setError(ru.error.generic);
+    } finally {
+      setLoading(false);
+    }
   }
 
   function goBack() {
@@ -110,13 +126,14 @@ export function CreateGroupScreen() {
               {copied ? ru.recovery.copied : ru.recovery.copy}
             </span>
           </Button>
+          {error && <p role="alert" className="text-sm" style={{ color: 'var(--danger)' }}>{error}</p>}
 
           <label className="flex cursor-pointer items-center gap-3 rounded-2xl p-4" style={{ backgroundColor: 'var(--surface)', border: `1px solid ${saved ? 'var(--primary)' : 'var(--border)'}` }}>
             <input type="checkbox" checked={saved} onChange={(e) => setSaved(e.target.checked)} className="h-5 w-5 shrink-0" style={{ accentColor: 'var(--primary)' }} />
             <span className="text-sm" style={{ color: 'var(--text)' }}>{ru.recovery.saved}</span>
           </label>
 
-          <Button fullWidth size="lg" disabled={!saved} onClick={handleEnterApp}>
+          <Button fullWidth size="lg" disabled={!saved || loading} loading={loading} onClick={handleEnterApp}>
             <span className="flex items-center justify-center gap-2">{ru.common.next} <ArrowRight size={18} /></span>
           </Button>
         </motion.div>

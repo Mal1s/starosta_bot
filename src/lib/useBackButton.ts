@@ -12,6 +12,11 @@ export function useBackButton() {
   useEffect(() => {
     const tg = getTelegramWebApp();
     if (!tg?.BackButton) return;
+    if (tg.isVersionAtLeast && !tg.isVersionAtLeast('6.1')) return;
+    if (!tg.isVersionAtLeast && tg.version) {
+      const [major, minor] = tg.version.split('.').map(Number);
+      if (major < 6 || (major === 6 && minor < 1)) return;
+    }
 
     const isAuth = authRoutes.includes(location.pathname);
     const isTab = tabRoutes.includes(location.pathname);

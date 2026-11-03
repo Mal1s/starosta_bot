@@ -1,4 +1,6 @@
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useMutation } from '@tanstack/react-query';
 import { Check } from 'lucide-react';
 import { ru } from '@/i18n/ru';
 import { ScreenHeader, Card } from '@/components/ui';
@@ -27,6 +29,40 @@ const backgrounds: { key: Background; label: string }[] = [
 export function SettingsScreen() {
   const { theme, background, reduceMotion, setTheme, setBackground, setReduceMotion } = useTheme();
   const me = useAppStore((s) => s.me);
+  const client = useAppStore((s) => s.client);
+  const [saveError, setSaveError] = useState(false);
+
+  const saveMutation = useMutation({
+    mutationFn: (input: { theme?: string; background?: string; reduce_motion?: boolean }) => {
+      if (!client) throw new Error('API client is unavailable');
+      return client.updateMeSettings(input);
+    },
+    onSuccess: () => setSaveError(false),
+    onError: () => setSaveError(true),
+  });
+
+  useEffect(() => {
+    if (!me?.user) return;
+    if (themes.some((item) => item.key === me.user.theme)) setTheme(me.user.theme as Theme);
+    if (backgrounds.some((item) => item.key === me.user.background)) setBackground(me.user.background as Background);
+    setReduceMotion(me.user.reduce_motion);
+  }, [me?.user?.theme, me?.user?.background, me?.user?.reduce_motion, setBackground, setReduceMotion, setTheme]);
+
+  function selectTheme(value: Theme) {
+    setTheme(value);
+    saveMutation.mutate({ theme: value });
+  }
+
+  function selectBackground(value: Background) {
+    setBackground(value);
+    saveMutation.mutate({ background: value });
+  }
+
+  function toggleReducedMotion() {
+    const nextValue = !reduceMotion;
+    setReduceMotion(nextValue);
+    saveMutation.mutate({ reduce_motion: nextValue });
+  }
 
   return (
     <div>
@@ -41,14 +77,16 @@ export function SettingsScreen() {
                 <motion.button
                   key={t.key}
                   whileTap={{ scale: 0.94 }}
+                  disabled={saveMutation.isPending}
+                  aria-pressed={theme === t.key}
                   onClick={() => {
                     haptic('light');
-                    setTheme(t.key);
+                    selectTheme(t.key);
                   }}
                   className="relative py-2.5 rounded-xl text-xs font-medium transition-colors overflow-hidden"
                   style={{
                     backgroundColor: theme === t.key ? 'var(--primary)' : 'var(--surface-2)',
-                    color: theme === t.key ? '#fff' : 'var(--text)',
+                    color: theme === t.key ? 'var(--primary-foreground)' : 'var(--text)',
                   }}
                 >
                   <div
@@ -73,14 +111,16 @@ export function SettingsScreen() {
                 <motion.button
                   key={b.key}
                   whileTap={{ scale: 0.94 }}
+                  disabled={saveMutation.isPending}
+                  aria-pressed={background === b.key}
                   onClick={() => {
                     haptic('light');
-                    setBackground(b.key);
+                    selectBackground(b.key);
                   }}
                   className="py-2.5 rounded-xl text-xs font-medium transition-colors"
                   style={{
                     backgroundColor: background === b.key ? 'var(--primary)' : 'var(--surface-2)',
-                    color: background === b.key ? '#fff' : 'var(--text)',
+                    color: background === b.key ? 'var(--primary-foreground)' : 'var(--text)',
                   }}
                 >
                   {b.label}
@@ -92,14 +132,22 @@ export function SettingsScreen() {
 
         <StaggerItem>
           <Card>
-            <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-sm" style={{ color: 'var(--text)' }}>{ru.settings.reduceMotion}</span>
-              <motion.div
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{ru.settings.reduceMotion}</p>
+                <p className="mt-1 text-xs" style={{ color: 'var(--muted)' }}>Отключить движение и переходы</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={reduceMotion}
+                aria-label={ru.settings.reduceMotion}
+                disabled={saveMutation.isPending}
                 onClick={() => {
                   haptic('light');
-                  setReduceMotion(!reduceMotion);
+                  toggleReducedMotion();
                 }}
-                className="relative w-12 h-7 rounded-full"
+                className="relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50"
                 style={{ backgroundColor: reduceMotion ? 'var(--primary)' : 'var(--surface-2)' }}
               >
                 <motion.div
@@ -108,11 +156,12 @@ export function SettingsScreen() {
                   className="absolute top-1 w-5 h-5 rounded-full bg-white"
                   style={{ boxShadow: '0 2px 6px rgba(0,0,0,0.2)' }}
                 />
-              </motion.div>
-            </label>
+              </button>
+            </div>
           </Card>
         </StaggerItem>
       </StaggerGroup>
+      {saveError && <p role="alert" className="mt-3 text-sm" style={{ color: 'var(--danger)' }}>{ru.error.generic}</p>}
     </div>
   );
 }

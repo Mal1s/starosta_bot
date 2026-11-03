@@ -13,6 +13,9 @@ import type {
   MyStats,
   Slot,
   BellEntry,
+  DayPollResponse,
+  PollAnswerInput,
+  CreateAbsenceInput,
 } from './types';
 
 export interface ApiClient {
@@ -64,6 +67,9 @@ export interface ApiClient {
   }): Promise<void>;
   getSchedule(from: string, to: string): Promise<DaySchedule[]>;
   getScheduleRaw(): Promise<{ slots: Slot[]; bell: BellEntry[] }>;
+  getDayPoll(date: string): Promise<DayPollResponse>;
+  submitPollAnswers(input: { date: string; answers: PollAnswerInput[] }): Promise<void>;
+  createAbsence(input: CreateAbsenceInput): Promise<unknown>;
   saveScheduleDraft(input: { slots: Slot[]; bell: BellEntry[] }): Promise<void>;
   publishSchedule(): Promise<void>;
   getScheduleVersions(): Promise<{ id: string; version: number; created_at: string }[]>;

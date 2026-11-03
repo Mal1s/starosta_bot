@@ -90,9 +90,9 @@ export function Button({
     ghost: 'transparent',
   };
   const colorMap: Record<string, string> = {
-    primary: '#FFFFFF',
+    primary: 'var(--primary-foreground)',
     secondary: 'var(--text)',
-    danger: '#FFFFFF',
+    danger: 'var(--danger-foreground)',
     ghost: 'var(--text)',
   };
   const sizeMap: Record<string, string> = {

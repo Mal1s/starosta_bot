@@ -5,6 +5,8 @@ declare global {
         ready: () => void;
         expand: () => void;
         close: () => void;
+        version?: string;
+        isVersionAtLeast?: (version: string) => boolean;
         initData: string;
         initDataUnsafe: {
           start_param?: string;
