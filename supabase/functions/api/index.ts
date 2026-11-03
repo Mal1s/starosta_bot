@@ -3,7 +3,7 @@
 // Routes per file 03 §5.2
 
 import { verifyInitData, type TelegramUser } from '../_shared/auth.ts';
-import { findOrCreateUser, getUserMembership, getSupabaseClient, hashToken, updateUserActivity, type MembershipWithContext } from '../_shared/db.ts';
+import { findOrCreateUser, getUserMembership, getSupabaseClient, updateUserActivity, type MembershipWithContext } from '../_shared/db.ts';
 import { shortCode, recoveryCode, weekParity, effectiveStatus, closeDayMapping, calcRate, voteQuorum } from '../_shared/rules.ts';
 
 const corsHeaders = {
@@ -169,56 +169,46 @@ Deno.serve(async (req: Request) => {
 
     // ===== POST /groups (create group) =====
     if (path === 'groups' && method === 'POST') {
-      if (membership && membership.status === 'active') {
-        return errorResponse('CONFLICT', 'Вы уже состоите в группе');
+      if (membership && (membership.status === 'active' || membership.status === 'pending')) {
+        return errorResponse('ALREADY_IN_GROUP', 'Вы уже состоите в группе');
       }
       const body = await req.json();
       if (!body.name || !body.full_name) {
         return errorResponse('VALIDATION', 'Название группы и ФИО обязательны');
       }
 
-      const token = crypto.randomUUID().replace(/-/g, '');
-      const tokenHash = await hashToken(token);
-      const code = shortCode();
-      const recCode = recoveryCode();
-      const recHash = await hashToken(recCode);
+      const allowed = await checkRateLimit(supabase, `create_group:${userId}`, 3, 24);
+      if (!allowed) return errorResponse('RATE_LIMIT', 'Слишком много попыток. Попробуйте через сутки.');
 
-      const { data: group, error } = await supabase
-        .from('groups')
-        .insert({
-          name: body.name,
-          institution: body.institution ?? null,
-          course: body.course ?? null,
-          timezone: body.timezone ?? 'Europe/Moscow',
-          invite_token_hash: tokenHash,
-          short_code: code,
-          recovery_hash: recHash,
-        })
-        .select('*')
-        .single();
+      const { data: result, error: rpcError } = await supabase.rpc('create_group', {
+        p_user_id: userId,
+        p_name: body.name,
+        p_full_name: body.full_name,
+        p_institution: body.institution ?? null,
+        p_course: body.course ?? null,
+        p_timezone: body.timezone ?? 'Europe/Moscow',
+        p_via: body.via ?? 'link',
+      });
 
-      if (error || !group) {
+      if (rpcError || !result || result.length === 0) {
+        const errMsg = String(rpcError?.message ?? '');
+        if (errMsg.includes('ALREADY_IN_GROUP')) return errorResponse('ALREADY_IN_GROUP', 'Вы уже состоите в группе');
         return errorResponse('INTERNAL', 'Не удалось создать группу', 500);
       }
 
-      const { data: newMembership } = await supabase
-        .from('memberships')
-        .insert({
-          group_id: group.id,
-          user_id: userId,
-          role: 'headman',
-          status: 'active',
-          full_name: body.full_name,
-        })
-        .select('*')
-        .single();
-
-      await auditLog(supabase, group.id, userId, 'group.create', 'group', group.id, null);
+      const r = result[0];
+      const botUser = Deno.env.get('BOT_USERNAME') ?? 'bot';
+      const { data: group } = await supabase.from('groups').select('*').eq('id', r.group_id).single();
 
       return jsonResponse({
         group,
-        invite: { link: `https://t.me/${Deno.env.get('BOT_USERNAME') ?? 'bot'}?startapp=${token}`, code },
-        recovery_code: recCode,
+        invite: {
+          token: r.invite_token,
+          code: r.short_code,
+          link: `https://t.me/${botUser}/${Deno.env.get('BOT_APP_SHORT_NAME') ?? 'app'}?startapp=${r.invite_token}`,
+          fallback_link: `https://t.me/${botUser}?start=${r.invite_token}`,
+        },
+        recovery_code: r.recovery_code,
       });
     }
 
@@ -232,83 +222,102 @@ Deno.serve(async (req: Request) => {
         return errorResponse('VALIDATION', 'Нужен код или токен приглашения');
       }
 
-      let group: Record<string, unknown> | null = null;
+      const { data: joinResult, error: rpcError } = await supabase.rpc('join_group', {
+        p_user_id: userId,
+        p_full_name: body.full_name,
+        p_token: body.token ?? null,
+        p_code: body.code ?? null,
+        p_roster_id: body.roster_id ?? null,
+        p_subgroup_ids: body.subgroup_ids ?? null,
+        p_consent_version: body.consent_version ?? 1,
+        p_via: body.via ?? (body.token ? 'link' : 'code'),
+      });
 
-      if (body.token) {
-        const tokenHash = await hashToken(body.token);
-        const { data } = await supabase.from('groups').select('*').eq('invite_token_hash', tokenHash).maybeSingle();
-        group = data;
-      } else if (body.code) {
-        const { data } = await supabase.from('groups').select('*').eq('short_code', body.code.toUpperCase()).maybeSingle();
-        group = data;
-      }
-
-      if (!group) {
-        return errorResponse('INVITE_INVALID', 'Группа не найдена');
-      }
-
-      // Check invite expiry
-      const expiresAt = group.invite_expires_at as string | null;
-      if (expiresAt && new Date(expiresAt) < new Date()) {
-        return errorResponse('INVITE_EXPIRED', 'Срок приглашения истёк');
-      }
-
-      // Check member limit
-      const { count } = await supabase
-        .from('memberships')
-        .select('id', { count: 'exact', head: true })
-        .eq('group_id', group.id as string)
-        .eq('status', 'active');
-      if (count && count >= (group.member_limit as number)) {
-        return errorResponse('GROUP_FULL', 'Группа заполнена');
-      }
-
-      // Check existing membership
-      const { data: existing } = await supabase
-        .from('memberships')
-        .select('*')
-        .eq('group_id', group.id as string)
-        .eq('user_id', userId)
-        .maybeSingle();
-
-      if (existing) {
-        if (existing.status === 'removed') {
-          return errorResponse('CONFLICT', 'Вас удалили из группы. Подайте новую заявку.');
+      if (rpcError || !joinResult || joinResult.length === 0) {
+        const errMsg = String(rpcError?.message ?? '');
+        const errorMap: Record<string, { code: string; msg: string }> = {
+          'INVITE_INVALID': { code: 'INVITE_INVALID', msg: 'Ссылка недействительна или устарела. Попроси у старосты новую' },
+          'INVITE_EXPIRED': { code: 'INVITE_EXPIRED', msg: 'Срок приглашения истёк. Попроси у старосты новое' },
+          'GROUP_FULL': { code: 'GROUP_FULL', msg: 'Группа заполнена. Напиши старосте' },
+          'GROUP_DELETING': { code: 'GROUP_DELETING', msg: 'Эта группа скоро будет удалена, вступить нельзя' },
+          'ALREADY_IN_GROUP': { code: 'ALREADY_IN_GROUP', msg: 'Вы уже состоите в другой группе' },
+          'JOIN_PAUSED': { code: 'INVITE_INVALID', msg: 'Ссылка недействительна или устарела. Попроси у старосты новую' },
+          'ROSTER_TAKEN': { code: 'ROSTER_TAKEN', msg: 'Эта запись уже занята. Если это ты, напиши старосте' },
+          'REJOIN_BLOCKED': { code: 'REJOIN_BLOCKED', msg: 'После удаления нельзя сразу подать заявку. Попробуй через 24 часа' },
+        };
+        for (const [key, val] of Object.entries(errorMap)) {
+          if (errMsg.includes(key)) return errorResponse(val.code, val.msg);
         }
-        // Reactivate
-        await supabase.from('memberships').update({ status: 'active', full_name: body.full_name }).eq('id', existing.id);
-        return jsonResponse(existing);
-      }
-
-      const status = group.join_mode === 'auto' ? 'active' : 'pending';
-      const { data: newMembership, error } = await supabase
-        .from('memberships')
-        .insert({
-          group_id: group.id as string,
-          user_id: userId,
-          role: 'student',
-          status,
-          full_name: body.full_name,
-        })
-        .select('*')
-        .single();
-
-      if (error || !newMembership) {
         return errorResponse('INTERNAL', 'Не удалось присоединиться', 500);
       }
 
-      // Link roster entry if provided
-      if (body.roster_id) {
-        await supabase.from('roster').update({ membership_id: newMembership.id }).eq('id', body.roster_id);
+      const r = joinResult[0];
+      return jsonResponse({
+        membership: { id: r.membership_id, status: r.membership_status, role: 'student' },
+        next: r.next_action,
+      });
+    }
+
+    // ===== GET /invites/resolve =====
+    if (path === 'invites/resolve' && method === 'GET') {
+      const token = url.searchParams.get('token');
+      const code = url.searchParams.get('code');
+      if (!token && !code) {
+        return errorResponse('VALIDATION', 'Нужен код или токен приглашения');
       }
 
-      // Link subgroups if provided
-      if (body.subgroup_ids && Array.isArray(body.subgroup_ids)) {
-        const subRows = body.subgroup_ids.map((sid: string) => ({ membership_id: newMembership.id, subgroup_id: sid }));
-        await supabase.from('membership_subgroups').insert(subRows);
+      const allowed = await checkRateLimit(supabase, `invite_resolve:${userId}`, 20, 1);
+      if (!allowed) return errorResponse('RATE_LIMIT', 'Слишком много попыток. Попробуй через час');
+
+      const { data: resolveResult, error: rpcError } = await supabase.rpc('resolve_invite', {
+        p_token: token,
+        p_code: code,
+      });
+
+      if (rpcError || !resolveResult || resolveResult.length === 0) {
+        const errMsg = String(rpcError?.message ?? '');
+        const errorMap: Record<string, { code: string; msg: string }> = {
+          'INVITE_INVALID': { code: 'INVITE_INVALID', msg: 'Ссылка недействительна или устарела. Попроси у старосты новую' },
+          'INVITE_EXPIRED': { code: 'INVITE_EXPIRED', msg: 'Срок приглашения истёк. Попроси у старосты новое' },
+          'GROUP_FULL': { code: 'GROUP_FULL', msg: 'Группа заполнена. Напиши старосте' },
+          'GROUP_DELETING': { code: 'GROUP_DELETING', msg: 'Эта группа скоро будет удалена, вступить нельзя' },
+          'JOIN_PAUSED': { code: 'INVITE_INVALID', msg: 'Ссылка недействительна или устарела. Попроси у старосты новую' },
+        };
+        for (const [key, val] of Object.entries(errorMap)) {
+          if (errMsg.includes(key)) return errorResponse(val.code, val.msg);
+        }
+        return errorResponse('INVITE_INVALID', 'Ссылка недействительна или устарела. Попроси у старосты новую');
       }
 
-      return jsonResponse(newMembership);
+      const r = resolveResult[0];
+      const grp = r.grp as Record<string, unknown>;
+      // Check if user is already a member
+      let alreadyMember = false;
+      if (membership && membership.group_id === grp.id) {
+        alreadyMember = true;
+      }
+
+      return jsonResponse({
+        group: { id: grp.id, name: grp.name, institution: grp.institution, course: grp.course },
+        headman_name: r.headman_name,
+        member_count: r.member_count,
+        member_limit: r.member_limit,
+        join_mode: r.join_mode,
+        subgroups: r.subgroups,
+        roster: r.roster_unassigned,
+        already_member: alreadyMember,
+      });
+    }
+
+    // ===== POST /membership/withdraw =====
+    if (path === 'membership/withdraw' && method === 'POST') {
+      if (!membership) return errorResponse('FORBIDDEN', 'Нет группы', 403);
+      if (membership.status !== 'pending') {
+        return errorResponse('VALIDATION', 'Можно отозвать только ожидающую заявку');
+      }
+      await supabase.from('memberships').update({ status: 'left', left_at: new Date().toISOString() }).eq('id', membership.id);
+      await auditLog(supabase, membership.group_id, userId, 'member.withdraw', 'membership', membership.id, null);
+      return jsonResponse(null);
     }
 
     // ===== POST /groups/restore =====
@@ -321,47 +330,31 @@ Deno.serve(async (req: Request) => {
       const allowed = await checkRateLimit(supabase, `recovery:${userId}`, 5, 1);
       if (!allowed) return errorResponse('RATE_LIMIT', 'Слишком много попыток. Попробуйте через час.');
 
-      const recHash = await hashToken(body.recovery_code);
-      const { data: group } = await supabase.from('groups').select('*').eq('recovery_hash', recHash).maybeSingle();
-      if (!group) {
-        return errorResponse('RECOVERY_INVALID', 'Неверный код восстановления');
-      }
-
-      // Check no active headman (or voting in progress)
-      const { data: activeHeadman } = await supabase
-        .from('memberships')
-        .select('id')
-        .eq('group_id', group.id)
-        .eq('role', 'headman')
-        .eq('status', 'active')
-        .maybeSingle();
-      if (activeHeadman) {
-        return errorResponse('CONFLICT', 'У группы уже есть активный староста');
-      }
-
-      // Transfer role to this account
-      await supabase.from('memberships').upsert({
-        group_id: group.id,
-        user_id: userId,
-        role: 'headman',
-        status: 'active',
-        full_name: body.full_name ?? auth.telegramUser.first_name ?? 'Староста',
+      const { data: restoreResult, error: rpcError } = await supabase.rpc('restore_headman', {
+        p_user_id: userId,
+        p_recovery_code: body.recovery_code,
       });
 
-      await supabase.from('leadership_events').insert({
-        group_id: group.id,
-        type: 'recovered',
-        target_id: userId,
-      });
+      if (rpcError || !restoreResult || restoreResult.length === 0) {
+        const errMsg = String(rpcError?.message ?? '');
+        if (errMsg.includes('RECOVERY_INVALID')) return errorResponse('RECOVERY_INVALID', 'Код не подходит. Проверь, что вводишь без ошибок');
+        if (errMsg.includes('ALREADY_IN_GROUP')) return errorResponse('ALREADY_IN_GROUP', 'Вы уже состоите в другой группе');
+        return errorResponse('INTERNAL', 'Не удалось восстановить', 500);
+      }
 
-      const { data: newMembership } = await supabase
-        .from('memberships')
-        .select('*')
-        .eq('group_id', group.id)
-        .eq('user_id', userId)
-        .single();
+      const r = restoreResult[0];
+      const { data: group } = await supabase.from('groups').select('*').eq('id', r.group_id).single();
+      const { data: newMembership } = await supabase.from('memberships').select('*').eq('id', r.membership_id).single();
 
-      return jsonResponse(newMembership);
+      return jsonResponse({ group, membership: newMembership });
+    }
+
+    // ===== POST /groups/recovery/ack =====
+    if (path === 'groups/recovery/ack' && method === 'POST') {
+      if (!membership) return errorResponse('FORBIDDEN', 'Нет группы', 403);
+      if (!requireHeadman(auth)) return errorResponse('FORBIDDEN', 'Только староста', 403);
+      await supabase.from('groups').update({ recovery_ack_at: new Date().toISOString() }).eq('id', membership.group_id);
+      return jsonResponse(null);
     }
 
     // ===== GET /groups/invite =====
@@ -371,14 +364,22 @@ Deno.serve(async (req: Request) => {
 
       const { data: group } = await supabase
         .from('groups')
-        .select('invite_token_hash, short_code')
+        .select('invite_token, short_code, invite_expires_at, join_paused, member_limit, join_mode')
         .eq('id', membership.group_id)
         .single();
 
-      // We return the hash as the token (client can't use it directly, but link uses original token)
+      const botUser = Deno.env.get('BOT_USERNAME') ?? 'bot';
+      const appShort = Deno.env.get('BOT_APP_SHORT_NAME') ?? 'app';
+      const token = group?.invite_token ?? '';
       return jsonResponse({
-        link: `https://t.me/${Deno.env.get('BOT_USERNAME') ?? 'bot'}?startapp=${group?.invite_token_hash ?? ''}`,
+        token,
         code: group?.short_code ?? '',
+        link: `https://t.me/${botUser}/${appShort}?startapp=${token}`,
+        fallback_link: `https://t.me/${botUser}?start=${token}`,
+        invite_expires_at: group?.invite_expires_at ?? null,
+        join_paused: group?.join_paused ?? false,
+        member_limit: group?.member_limit ?? 60,
+        join_mode: group?.join_mode ?? 'approval',
       });
     }
 
@@ -388,14 +389,17 @@ Deno.serve(async (req: Request) => {
       if (!requireHeadman(auth)) return errorResponse('FORBIDDEN', 'Только староста', 403);
 
       const token = crypto.randomUUID().replace(/-/g, '');
-      const tokenHash = await hashToken(token);
       const code = shortCode();
-      await supabase.from('groups').update({ invite_token_hash: tokenHash, short_code: code }).eq('id', membership.group_id);
+      await supabase.from('groups').update({ invite_token: token, short_code: code }).eq('id', membership.group_id);
       await auditLog(supabase, membership.group_id, userId, 'settings.update', 'group', membership.group_id, { invite: 'regenerated' });
 
+      const botUser = Deno.env.get('BOT_USERNAME') ?? 'bot';
+      const appShort = Deno.env.get('BOT_APP_SHORT_NAME') ?? 'app';
       return jsonResponse({
-        link: `https://t.me/${Deno.env.get('BOT_USERNAME') ?? 'bot'}?startapp=${token}`,
+        token,
         code,
+        link: `https://t.me/${botUser}/${appShort}?startapp=${token}`,
+        fallback_link: `https://t.me/${botUser}?start=${token}`,
       });
     }
 
